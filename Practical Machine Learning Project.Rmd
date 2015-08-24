@@ -1,0 +1,109 @@
+---
+title: "Practical Machine Learning Course Project"
+author: "Matthew Fergusson"
+date: "August 23, 2015"
+output: html_document
+---
+
+#Human Activity Recognition
+
+This report focuses on recognizing different activities performed by participants in from a study called "Wearable Computing: Accelerometers' Data Classification of Body Postures and Movements" by Ugulino, W.; Cardador, D.; Vega, K.; Velloso, E.; Milidiu, R.; Fuks, H.
+
+Read more: http://groupware.les.inf.puc-rio.br/har#sbia_paper_section#ixzz3jgrWM8W2
+
+The data set looks at Six young health participants that were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E).
+
+#Data Steps
+
+Read in libraries
+
+```{r, echo=FALSE}
+library(caret)
+library(randomForest)
+library(tidyr)
+library(dplyr)
+library(sqldf)
+```
+
+Read in data files
+
+```{r, echo=TRUE}
+setwd("C:/Users/mfergusson/Desktop/MTF Personal/Education - Coursera Data Science Specialization/08 - Practical Machine Learning/Course_Projects/Data Sets")
+
+#read in documents
+Raw_HAR_Data_Train <- read.csv("pml-training.csv", header = TRUE)
+Raw_HAR_Data_Test <- read.csv("pml-testing.csv", header = TRUE)
+
+
+HAR_Data_Train <- Raw_HAR_Data_Train
+HAR_Data_Test <- Raw_HAR_Data_Test
+
+```
+
+Once the data has been read in, the data is further modified to prepare the data set for model fitting. In order to do this the following procedures were performed:
+
+1) Remove columns that contain greater than 75% NA values. This eliminates the columns that appear to show aggregate figures from each excercise set.
+2) Remove fields with near zero variance that would have little descriptive power 
+3) Remove the identifying fields in the first 6 columns that don't have explanatory power for fitting a model.
+
+```{r, echo=TRUE}
+# Data Manipulation
+  # Remove columnss with NA > 75%
+    na_col <- names(HAR_Data_Train[, colSums(is.na(HAR_Data_Train)) > nrow(HAR_Data_Train)*.75])
+    HAR_Data_Train[,na_col] <- list(NULL)
+    #93 Variables
+  # Remove nearZeroVar fields
+    ZVar <- nearZeroVar(HAR_Data_Train)
+    HAR_Data_Train[,ZVar] <- list(NULL)
+    #59 Variables
+  # Discart ID columns
+    HAR_Data_Train[,1:6]<- list(NULL)
+    #53 Variables
+```
+
+
+# Create model to predict the test data values  
+
+First the training data divided into 60% model training and 40% model testing sets.
+
+```{r, echo=TRUE}
+#Set seed for creating partitioned data sets
+  set.seed(1986)
+
+#set train and test
+  Partitions <- createDataPartition(y= Raw_HAR_Data_Train$classe, p = 0.60, list = FALSE)
+  model_train = HAR_Data_Train[Partitions,]
+  model_test = HAR_Data_Train[-Partitions,]
+```
+
+Next the training set is set to be trained using. The random forest model was chosen because it is a robust option that optimizes over multiple decision trees.
+
+```{r, echo=TRUE}
+#Set seed for creating partitioned data sets
+  set.seed(1989)
+
+#fit random forest model 
+  fit <- randomForest(classe ~., data=model_train, ntree=1000,keep.forest=TRUE)
+```  
+
+Next the random forest model created from the training set was applied to the other portion of the training set and a confustion matrix was created to analyze the accuracy of the models predictions.
+
+```{r, echo=TRUE}
+#Apply model to test set of the training data set
+  prediction_train <- predict(fit, model_test)
+
+#look at prediction confustion matrix
+  confusionMatrix(model_test$classe, prediction_train)
+```
+
+The overall accuracy of the predictions are 0.995 with a p-value of < 2.2e-16 which gives enough confidence to apply this model to predict values in the test data set that does not have labeled fashions of Unilateral Dumbbell Biceps Curls.
+
+# Predictions
+
+After checking the accuracy of the model it is then applied to the test data set to infer what the model predicts the fashions of Unilateral Dumbbell Biceps Curls performed in that data set. 
+
+```{r, echo=TRUE}
+#create prediction values
+  prediction_test <- predict(fit, HAR_Data_Test)
+  prediction_test
+```
